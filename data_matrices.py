@@ -200,17 +200,9 @@ if __name__ == "__main__":
     print(f"The shape of V is {V.shape}")
     print(f"The shape of X_stacked is {X_stacked.shape}")
 
-    # fig2 = plt.figure()
-    # ax2 = fig2.add_subplot(111, projection='3d')
-    # ax2.scatter(X_stacked[0],X_stacked[1],X_stacked[2])
-    # ax2.quiver(X_stacked[0],X_stacked[1],X_stacked[2], V[0], V[1], V[2], normalize=True, length=0.6, color='k', alpha=0.3)
-    
     fig2, ax2 = db.scaled_3D_quiver(X_stacked, V, mode="tangent")
     fig2, ax2 = db.scaled_3D_quiver(X_stacked, N, mode="normal")
     
-
-
-
     plt.show()
     
    
