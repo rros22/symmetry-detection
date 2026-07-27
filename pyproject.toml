@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+notebooks = ["jupyter>=1.0", "ipykernel>=6.0"]
 
 [project.scripts]
 symdet-generate = "symmetry_detection.cli:generate_main"

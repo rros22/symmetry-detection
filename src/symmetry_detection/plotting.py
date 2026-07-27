@@ -1,46 +1,13 @@
+"""
+Matplotlib plotting helpers shared by the example scripts: trajectory/vector
+field quiver plots in the (x, u, p) jet space, and bar charts of learnt basis
+coefficients.
+"""
+
 import numpy as np
-from rich.console import Console
-from rich.table import Table
 from matplotlib import pyplot as plt
 
-# Printing for debbuging
-def print_configuration(ode_name, x_start, x_end, initial_conditions, num_points, method):
-    # Format array preview nicely
-    ic_arr = np.asarray(initial_conditions)
-    if len(ic_arr) > 4:
-        ic_str = f"[{ic_arr[0]:.2f}, {ic_arr[1]:.2f}, ..., {ic_arr[-1]:.2f}] ({len(ic_arr)} trajectories)"
-    else:
-        ic_str = f"{np.round(ic_arr, 2).tolist()}"
 
-    title = f" INTEGRATION CONFIGURATION: {ode_name.upper()} "
-    width = 60
-
-    print("=" * width)
-    print(f"{title.center(width, ' ')}")
-    print("=" * width)
-    print(f"  {'Domain (X Span)':<25} : [{x_start}, {x_end}]")
-    print(f"  {'Points per Trajectory':<25} : {num_points}")
-    print(f"  {'Initial Conditions':<25} : {ic_str}")
-    print(f"  {'Solver Method':<25} : {method}")
-    print("-" * width)
-
-def print_configuration_rich(ode_name, x_start, x_end, initial_conditions, num_points, method):
-    console = Console()
-    ic_arr = np.asarray(initial_conditions)
-    
-    table = Table(title=f"ODE Configuration — {ode_name.upper()}", title_style="bold cyan", border_style="dim")
-    table.add_column("Parameter", style="bold white", justify="left")
-    table.add_column("Value", style="green", justify="left")
-
-    table.add_row("X Range", f"[{x_start}, {x_end}]")
-    table.add_row("Resolution", f"{num_points} points/trajectory")
-    table.add_row("Trajectory Count", f"{len(ic_arr)} initial conditions")
-    table.add_row("IC Range", f"[{ic_arr.min():.2f} ... {ic_arr.max():.2f}]")
-    table.add_row("Integrator", method)
-
-    console.print(table)
-
-# Plots
 def compute_data_range(X):
     if len(X.shape) == 2:
         if X.shape[0] != 3:
@@ -62,13 +29,14 @@ def compute_data_range(X):
 
     return x_range, u_range, p_range
 
+
 def _unit_cube_transform(X, N, x_range, u_range, p_range, mode="normal"):
     """
     Mode can be "normal" or "tangent". First check if mode is any of the two.
     """
     if mode not in ["normal", "tangent"]:
         raise ValueError(f"Mode must be 'normal' or 'tangent', got {mode!r}")
-    
+
 
     mins = np.array([x_range[0], u_range[0], p_range[0]])
     spans = np.array([
@@ -148,7 +116,7 @@ def scaled_3D_quiver(X_stacked, V, style='scatter', num_points=None, mode="norma
 
     return fig, ax
 
-# Small wrapper for the scaled_3D_quiver function to plot integrated trajectories.
+
 def scaled_3D_quiver_trajectories(X_stacked, normal_fn, style="lines", num_points=None, mode="normal", ax=None):
     """
     Plot integrated trajectories with their normal field.
@@ -160,4 +128,82 @@ def scaled_3D_quiver_trajectories(X_stacked, normal_fn, style="lines", num_point
     return scaled_3D_quiver(X_stacked, V, style=style, num_points=num_points, mode=mode, ax=ax)
 
 
+def format_basis_label(basis_type, m, n):
+    """Return a matplotlib/LaTeX label for basis function parameters (m, n)."""
+    if basis_type == "monomial":
+        parts = []
+        if m != 0:
+            parts.append("x" if m == 1 else f"x^{{{m}}}")
+        if n != 0:
+            parts.append("u" if n == 1 else f"u^{{{n}}}")
+        if not parts:
+            return r"$1$"
+        return "$" + " ".join(parts) + "$"
 
+    if basis_type == "chebyshev":
+        def _cheb(var, k):
+            return "1" if k == 0 else f"T_{{{k}}}({var})"
+
+        return f"${_cheb('x', m)} {_cheb('u', n)}$"
+
+    raise ValueError(f"Unknown basis type: {basis_type!r}")
+
+
+def plot_basis_coefficient_bars(
+    coeffs,
+    param_list,
+    basis_type,
+    *,
+    sort_by_magnitude=True,
+    ax=None,
+    title=None,
+    log_scale=False,
+):
+    """
+    Bar chart of basis functions versus learnt coefficients for one component
+    (e.g. xi or eta coefficients from a single SVD singular vector).
+
+    Parameters
+    ----------
+    coeffs : array-like, shape (num_basis,)
+        Coefficients aligned with param_list.
+    param_list : list of (m, n) tuples
+        Basis function parameter pairs.
+    basis_type : str
+        "monomial" or "chebyshev".
+    sort_by_magnitude : bool, default True
+        If True, sort bars by descending |coefficient|; otherwise use param_list order.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on; if None, a new figure/axes is created.
+    title : str, optional
+        Axes title.
+
+    Returns
+    -------
+    fig, ax
+    """
+    coeffs = np.asarray(coeffs)
+    if len(coeffs) != len(param_list):
+        raise ValueError(
+            f"coeffs length {len(coeffs)} does not match param_list length {len(param_list)}."
+        )
+
+    order = np.argsort(-np.abs(coeffs)) if sort_by_magnitude else np.arange(len(coeffs))
+    sorted_coeffs = coeffs[order]
+    labels = [format_basis_label(basis_type, m, n) for m, n in param_list]
+    sorted_labels = [labels[i] for i in order]
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(max(6, len(coeffs) * 0.4), 4))
+    else:
+        fig = ax.figure
+
+    ax.bar(np.arange(len(sorted_coeffs)), sorted_coeffs, color="C0", log=log_scale)
+    ax.set_xticks(np.arange(len(sorted_labels)))
+    ax.set_xticklabels(sorted_labels, rotation=45, ha="right")
+    ax.set_ylabel("Coefficient")
+    ax.axhline(0, color="k", linewidth=0.5)
+    if title is not None:
+        ax.set_title(title)
+
+    return fig, ax

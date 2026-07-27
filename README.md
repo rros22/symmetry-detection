@@ -41,11 +41,21 @@ python examples/plot_ode_manifold.py --ode bernoulli
 python examples/run_odes_demo.py --ode bernoulli
 ```
 
+For an interactive version where you can tune the basis type/elements and re-run just
+the detection plots without regenerating trajectories, see
+[`notebooks/ode_symmetry_explorer.ipynb`](notebooks/ode_symmetry_explorer.ipynb):
+
+```bash
+pip install -e ".[notebooks]"
+jupyter notebook notebooks/ode_symmetry_explorer.ipynb
+```
+
 ## Project layout
 
 ```
 src/symmetry_detection/   Installable package: ODE catalog, basis functions, detection engine
 examples/                 Runnable demo/plotting scripts (not part of the installed package)
+notebooks/                Interactive Jupyter notebooks built on the same package API
 tests/                    Automated tests (pytest)
 ```
 

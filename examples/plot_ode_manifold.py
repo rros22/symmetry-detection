@@ -10,13 +10,14 @@ Usage:
 import numpy as np
 from matplotlib import pyplot as plt
 
-from symmetry_detection import debugging as db
 from symmetry_detection import generate_trajectories as gtr
+from symmetry_detection import plotting as plot
 
-# Default case run when this script is invoked with no CLI arguments. Edit any
-# value here to change what runs by default; every field can still be overridden
-# individually from the command line (e.g. `--ode bernoulli`). Leave fields as
-# None to fall back via resolve_ode_args to ODE_DEFAULTS[ode].
+# Top-level defaults for this script, applied before CLI parsing. Any value
+# passed explicitly on the command line (e.g. `--ode bernoulli`) always takes
+# precedence over what's set here. Leave a field as None to fall back to the
+# package-wide defaults in symmetry_detection.defaults instead (applied by
+# resolve_ode_args).
 DEFAULT_CASE = dict(
     ode="bernoulli",
     start=None,
@@ -71,12 +72,12 @@ def main():
     p_grid_max = np.max(P_grid)
 
     # Evaluate analytic normal field on the surface
-    fig2, ax3 = db.scaled_3D_quiver_surface(
+    fig2, ax3 = plot.scaled_3D_quiver_surface(
         X_grid, U_grid, P_grid, gtr.NORMALS[args.ode](X_grid, U_grid),
         (x_min, x_max), (u_min, u_max), (p_grid_min, p_grid_max),
     )
     X_stacked = gtr.concatenate_trajectories(X)
-    fig3, ax4 = db.scaled_3D_quiver_trajectories(
+    fig3, ax4 = plot.scaled_3D_quiver_trajectories(
         X_stacked, gtr.NORMALS[args.ode], style='lines', num_points=args.num_points)
 
     # Plotting

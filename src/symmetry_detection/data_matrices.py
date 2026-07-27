@@ -2,6 +2,7 @@ import numpy as np
 import argparse
 
 from . import basis_functions as bf
+from . import defaults as dflt
 
 """
     Contains functions that generate matrices, which evaluate the basis functions and their derivatives at the points of the trajectories.
@@ -33,7 +34,7 @@ def _parse_pair(s):
 
 def build_basis_parser(add_help=True):
     parser = argparse.ArgumentParser(description="Basis function options.", add_help=add_help)
-    parser.add_argument("--basis_type", choices=bf.BASIS_FUNCTIONS.keys(), default="monomial",
+    parser.add_argument("--basis_type", choices=bf.BASIS_FUNCTIONS.keys(), default=None,
                          help="Basis function family to use")
     parser.add_argument("--param_range", type=int, nargs=2, default=None, metavar=("MIN", "MAX"),
                          help="Parameter range (m, n) for basis functions, e.g. --param_range 0 3")
@@ -43,16 +44,18 @@ def build_basis_parser(add_help=True):
 
 def resolve_basis_args(args):
     """
-    Normalize parsed basis CLI args. This is the only place that applies default
-    basis_type / param_range when the user does not pass them on the command line.
+    Fill basis parameters from symmetry_detection.defaults when not provided
+    on the CLI. This is the only place that applies default basis_type /
+    param_range.
     """
+    args.basis_type = args.basis_type if args.basis_type is not None else dflt.DEFAULT_BASIS_TYPE
     if args.param_range is not None:
         args.param_range = tuple(args.param_range)
     elif args.param_list is None:
-        args.param_range = (0, 1)
+        args.param_range = dflt.DEFAULT_PARAM_RANGE
     return args
 
-def _validate_parameters(basis_type, param_range=None, param_list=None):
+def validate_parameters(basis_type, param_range=None, param_list=None):
     if basis_type not in bf.BASIS_FUNCTIONS:
         raise ValueError(
             f"Invalid basis type: {basis_type}. Valid options are: {list(bf.BASIS_FUNCTIONS.keys())}"
@@ -136,7 +139,7 @@ def bf_matrices(X_stacked, basis_type, param_range=None, param_list=None):
         raise ValueError(f"The shape of the input data matrix is {X_stacked.shape}, with dimension = {len(X_stacked.shape)}. It should be a 2D array")
 
     # Validate parameters
-    validated_param_list = _validate_parameters(basis_type, param_range, param_list)
+    validated_param_list = validate_parameters(basis_type, param_range, param_list)
 
     # Extract repeated variables once
     x, u = X_stacked[0].T, X_stacked[1].T

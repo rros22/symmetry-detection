@@ -72,9 +72,6 @@ def characteristic_functions(L, L_x, L_u, P, coeffs):
     coeff_no = len(coeffs)
     if coeff_no % 2 != 0:
         raise ValueError(f"The number of coefficients is {coeff_no} which is not an even number.")
-    
-    print(f"Xi coefficients {coeffs[0:int(coeff_no/2)]}")
-    print(f"Eta coefficients {coeffs[int(coeff_no/2):]}")
 
     xi_coeffs = coeffs[0:int(coeff_no/2)]
     eta_coeffs = coeffs[int(coeff_no/2):]

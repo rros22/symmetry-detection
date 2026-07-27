@@ -7,7 +7,8 @@ import argparse
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from . import debugging as db
+from . import defaults as dflt
+from . import reporting as rpt
 
 # ODEs
 def bernoulli_ode(x,u):
@@ -129,49 +130,6 @@ INTEGRATORS = {
     "LSODA": "LSODA",
 }
 
-ODE_DEFAULTS = {
-    "rational": {
-        "x_start": 0.75,
-        "x_end": 2.0,
-        "initial_conditions": np.linspace(1, 7, 20),
-        "initial_condition": 1.0,
-        "num_points": 50,
-        "method": "RK45",
-    },
-    "bernoulli": {
-        "x_start": 0.2,
-        "x_end": 1.2,
-        "initial_conditions": np.linspace(0.75, 2, 10),
-        "initial_condition": 1.0,
-        "num_points": 30,
-        "method": "RK45",
-    },
-    "riccati": {
-        "x_start": 0.1,
-        "x_end": 0.5,
-        "initial_conditions": np.linspace(-50, 106, 10),
-        "initial_condition": 1.0,
-        "num_points": 30,
-        "method": "RK45",
-    },
-    "scaling": {
-        "x_start": 0.1,
-        "x_end": 2,
-        "initial_conditions": np.linspace(0.1, 2, 15),
-        "initial_condition": 1.0,
-        "num_points": 30,
-        "method": "RK45",
-    },
-    "abel": {
-        "x_start": 0.0,
-        "x_end": 0.09,
-        "initial_conditions": np.linspace(-2, 2, 200),
-        "initial_condition": 0.0,
-        "num_points": 50,
-        "method": "RK45",
-    },
-}
-
 # Generate a full trajectory
 def _generate_trajectory(ode_name, x_start, x_end, u0, num_points, method):
     """
@@ -205,7 +163,7 @@ def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num
     """
 
     # Input data
-    db.print_configuration_rich(ode_name, x_start, x_end, initial_conditions, num_points, method)
+    rpt.print_ode_configuration(ode_name, x_start, x_end, initial_conditions, num_points, method)
 
     # Iterate over all initial conditions
     trajectories = []
@@ -235,7 +193,7 @@ def build_ode_parser(add_help=True):
     parser = argparse.ArgumentParser(
         description="Generate and test ODE trajectories.", add_help=add_help
     )
-    parser.add_argument("--ode", choices=ODES.keys(), default="bernoulli", help="Name of the ODE to solve")
+    parser.add_argument("--ode", choices=ODES.keys(), default=None, help="Name of the ODE to solve")
     parser.add_argument("--start", type=float, default=None, help="Start x value")
     parser.add_argument("--end", type=float, default=None, help="End x value")
     parser.add_argument("--initial_conditions", type=float, nargs="+", default=None,
@@ -246,16 +204,18 @@ def build_ode_parser(add_help=True):
 
 def resolve_ode_args(args):
     """
-    Fill integration parameters from ODE_DEFAULTS when not provided on the CLI.
-    This is the only place that applies default integration settings.
+    Fill in the ODE name and integration parameters from
+    symmetry_detection.defaults when not provided on the CLI. This is the
+    only place that applies default integration settings.
     """
-    if args.ode not in ODE_DEFAULTS:
+    args.ode = args.ode if args.ode is not None else dflt.DEFAULT_ODE
+    if args.ode not in dflt.ODE_DEFAULTS:
         raise ValueError(
             f"No default integration parameters for ODE {args.ode!r}. "
-            f"Choose from {list(ODE_DEFAULTS.keys())} or pass --start, --end, "
+            f"Choose from {list(dflt.ODE_DEFAULTS.keys())} or pass --start, --end, "
             f"--initial_conditions, --num_points, and --method explicitly."
         )
-    defaults = ODE_DEFAULTS[args.ode]
+    defaults = dflt.ODE_DEFAULTS[args.ode]
     args.start = args.start if args.start is not None else defaults["x_start"]
     args.end = args.end if args.end is not None else defaults["x_end"]
     if args.initial_conditions is not None:
