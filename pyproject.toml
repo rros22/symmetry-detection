@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "symmetry-detection"
+version = "0.1.0"
+description = "Data-driven detection of point symmetries in ODEs"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Ramon", email = "ramon@roslab.com" }]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+symdet-generate = "symmetry_detection.cli:generate_main"
+symdet-detect = "symmetry_detection.cli:detect_main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/symmetry_detection"]

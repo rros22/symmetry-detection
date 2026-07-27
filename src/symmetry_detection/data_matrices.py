@@ -1,9 +1,7 @@
-import basis_functions as bf
-import generate_trajectories as gtr
-import debugging as db
 import numpy as np
-from scipy.linalg import svd
-from matplotlib import pyplot as plt
+import argparse
+
+from . import basis_functions as bf
 
 """
     Contains functions that generate matrices, which evaluate the basis functions and their derivatives at the points of the trajectories.
@@ -21,6 +19,38 @@ from matplotlib import pyplot as plt
         - The basis type is the type of basis functions to use. Current options are "monomial" and "chebyshev". Some options have invalid parameters. For example the chevyshev basis functions are only defined for non-negative parameters. 
           If the parameter range or list contains invalid parameters, then the function will raise an error.
 """
+
+# Parse CLI arguments
+
+# data_matrices.py
+def _parse_pair(s):
+    """Parses 'm,n' into the (m, n) tuple expected by param_list."""
+    try:
+        m, n = s.split(",")
+        return (int(m), int(n))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid pair '{s}', expected format 'm,n'")
+
+def build_basis_parser(add_help=True):
+    parser = argparse.ArgumentParser(description="Basis function options.", add_help=add_help)
+    parser.add_argument("--basis_type", choices=bf.BASIS_FUNCTIONS.keys(), default="monomial",
+                         help="Basis function family to use")
+    parser.add_argument("--param_range", type=int, nargs=2, default=None, metavar=("MIN", "MAX"),
+                         help="Parameter range (m, n) for basis functions, e.g. --param_range 0 3")
+    parser.add_argument("--param_list", type=_parse_pair, nargs="+", default=None,
+                         help="Explicit list of (m,n) pairs, e.g. --param_list 0,0 1,0 0,1. Overrides --param_range")
+    return parser
+
+def resolve_basis_args(args):
+    """
+        Normalizes parsed --param_range/--param_list CLI args, applying the same
+        default range used by G_matrix/bf_matrices when neither is provided.
+    """
+    if args.param_range is not None:
+        args.param_range = tuple(args.param_range)
+    elif args.param_list is None:
+        args.param_range = (0, 3)
+    return args
 
 def _validate_parameters(basis_type="monomial", param_range=(0, 3), param_list=None):
     # 1. Validate basis type
@@ -146,63 +176,3 @@ def G_matrix(X_stacked, N, basis_type="monomial", param_range=(0, 3), param_list
     G = np.vstack((G_1,G_2))
 
     return G, L, L_x, L_u, P 
-
-if __name__ == "__main__":
-    # Test the full symmetry detection null space problem on the rational equation with rotational symmetry.
-    # 0. Define parameters
-    ode_name = "bernoulli"
-    basis_type="monomial"
-
-    integration_params = gtr.ODE_DEFAULTS[ode_name]
-    x_start = integration_params["x_start"]
-    x_end = integration_params["x_end"]
-    initial_conditions = integration_params["initial_conditions"]
-    num_points = integration_params["num_points"]
-    method = integration_params["method"]
-    
-    # 1. Generate data
-    X = gtr.generate_equation_manifold(
-        ode_name=ode_name, 
-        x_start=x_start, 
-        x_end=x_end, 
-        initial_conditions=initial_conditions, 
-        num_points=num_points, 
-        method=method
-    )
-
-    print("Everything is working so far")
-    
-    X_stacked = gtr.concatenate_trajectories(X)
-    N = gtr.NORMALS[ode_name](X_stacked[0], X_stacked[1])
-
-    # 2. Construct the G matrix
-    G, L, L_x, L_u, P  = G_matrix(X_stacked, N, basis_type=basis_type, param_range=(-2, 1), param_list=None)
-
-    # 3. Solve the null space problem (on G transposed) using the SVD
-    U,S,Vt = svd(G.T)
-    idx = np.argmin(S)
-
-    # 4. Plot singular value spectrum
-    fig, ax = plt.subplots(1,2)
-    ax[0].semilogy(S,marker='o', linestyle='None')
-
-    # 5. Plot the trajectories and the reconstructed vector field
-    xi, eta, zeta = bf.characteristic_functions(L, L_x, L_u, P, Vt[idx, :])
-
-    ax[1].quiver(X_stacked[0], X_stacked[1], xi, eta, angles='xy',scale=20,scale_units='xy')
-    ax[1].set_box_aspect(1)
-
-    for trajectory in X:
-        ax[1].plot(trajectory[0], trajectory[1])
-
-    # 6. Plot the jet space reconstructed tangent field
-    V = np.stack((xi,eta,zeta))
-    print(f"The shape of V is {V.shape}")
-    print(f"The shape of X_stacked is {X_stacked.shape}")
-
-    fig2, ax2 = db.scaled_3D_quiver(X_stacked, V, mode="tangent")
-    fig2, ax2 = db.scaled_3D_quiver(X_stacked, N, mode="normal")
-    
-    plt.show()
-    
-   

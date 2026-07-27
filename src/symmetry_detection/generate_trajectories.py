@@ -6,8 +6,8 @@
 import argparse
 import numpy as np
 from scipy.integrate import solve_ivp
-from matplotlib import pyplot as plt
-import debugging as db
+
+from . import debugging as db
 
 # ODEs
 def bernoulli_ode(x,u):
@@ -227,110 +227,28 @@ def concatenate_trajectories(X):
     num_traj, state_dim, num_pts = X.shape
     return X.transpose(1, 0, 2).reshape(state_dim, -1)
 
-# CLI Tooling (Only runs when executed as main)
-def _get_args():
-    """
-        Isolates parser
-    """
-    parser = argparse.ArgumentParser(description="Generate and test ODE trajectories.")
-    parser.add_argument(
-        "--ode",
-        choices = ODES.keys(),
-        default = "abel",
-        help = "Name of the ODE to solve (default: bernoulli)"
+# CLI tooling
+def build_ode_parser(add_help=True):
+    parser = argparse.ArgumentParser(
+        description="Generate and test ODE trajectories.", add_help=add_help
     )
-
-    #Extra arguments
+    parser.add_argument("--ode", choices=ODES.keys(), default="bernoulli", help="Name of the ODE to solve")
     parser.add_argument("--start", type=float, default=None, help="Start x value")
     parser.add_argument("--end", type=float, default=None, help="End x value")
-    parser.add_argument("--initial_condition", type=float, default=None, help="Initial condition u(start)")
-    parser.add_argument("--initial_conditions", type=float,nargs="+", default=None, help="Initial conditions, e.g. --initial_conditions 1.0 1.1 1.2")
+    parser.add_argument("--initial_conditions", type=float, nargs="+", default=None,
+                         help="Initial conditions, e.g. --initial_conditions 1.0 1.1 1.2")
     parser.add_argument("--num_points", type=int, default=None, help="Number of points per trajectory")
-    parser.add_argument("--method", choices= INTEGRATORS.keys(), default=None, help="Numerical integrator choice, default RK45")
+    parser.add_argument("--method", choices=INTEGRATORS.keys(), default=None, help="Numerical integrator choice")
+    return parser
 
-    args = parser.parse_args()
-
-    # Get the dictionary of default arguments for the requested ODE
+def resolve_ode_args(args):
     defaults = ODE_DEFAULTS.get(args.ode, {})
-
-    # Merge: Override default arguments with those from the CLI
     args.start = args.start if args.start is not None else defaults.get("x_start", 1.0)
     args.end = args.end if args.end is not None else defaults.get("x_end", 7.0)
-    args.initial_condition = args.initial_condition if args.initial_condition is not None else defaults.get("initial_condition", 1.0)
-
-    # Correct plural check and assignment:
     if args.initial_conditions is not None:
         args.initial_conditions = np.array(args.initial_conditions)
     else:
         args.initial_conditions = defaults.get("initial_conditions", np.linspace(0.75, 2, 10))
-    
     args.num_points = args.num_points if args.num_points is not None else defaults.get("num_points", 30)
     args.method = args.method if args.method is not None else defaults.get("method", "RK45")
-
     return args
-
-def main():
-    print("Running as main")
-
-    # Extract arguments
-    args = _get_args()
-
-    # Test: Generate equation manifold
-    X = generate_equation_manifold(
-        ode_name=args.ode,
-        x_start = args.start,
-        x_end = args.end,
-        initial_conditions= args.initial_conditions,
-        num_points=args.num_points,
-        method = args.method
-    )
-
-    fig = plt.figure(figsize=(6,6))
-    ax0 = fig.add_subplot(131, projection='3d')
-    ax1 = fig.add_subplot(132, projection='3d')
-    ax2 = fig.add_subplot(133)
-
-    ax2.set_box_aspect(1)
-    ax0.set_aspect('equal')
-
-    # Define grid of values of surface manifold over [x_min,x_max] x [u_min,u_max].
-    x_min = np.min(X[:,0,:])
-    x_max = np.max(X[:,0,:])
-    u_min = np.min(X[:,1,:])
-    u_max = np.max(X[:,1,:])
-
-    # Define p axis limits. They are different for integrated trajectories and for the grid over which the surface is plotted.
-    p_traj_min = np.min(X[:,2,:])
-    p_traj_max = np.max(X[:,2,:])
-
-    res = 20
-
-    X_grid = np.linspace(x_min,x_max,res)
-    U_grid = np.linspace(u_min,u_max,res)
-
-    X_grid, U_grid = np.meshgrid(X_grid, U_grid)
-    P_grid = ODES[args.ode](X_grid,U_grid)
-
-    p_grid_min = np.min(P_grid)
-    p_grid_max = np.max(P_grid)
-
-    # Evaluate analytic normal field on the surface
-    fig2, ax3 = db.scaled_3D_quiver_surface(
-        X_grid, U_grid, P_grid, NORMALS[args.ode](X_grid,U_grid),
-        (x_min, x_max), (u_min, u_max), (p_grid_min, p_grid_max),
-    )
-    X_stacked = concatenate_trajectories(X)
-    fig3, ax4 = db.scaled_3D_quiver_trajectories(
-        X_stacked, NORMALS[args.ode], style='lines', num_points=args.num_points)
-    
-    # Plotting
-    ax0.plot_surface(X_grid,U_grid,P_grid, cmap='coolwarm')
-
-    for trajectory in X:
-        ax1.plot(trajectory[0,:], trajectory[1,:], trajectory[2,:])
-        ax2.plot(trajectory[0,:], trajectory[1,:])
-
-    plt.show()
-
-if __name__ == "__main__":
-    main()
