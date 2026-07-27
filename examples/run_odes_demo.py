@@ -24,7 +24,7 @@ DEFAULT_CASE = dict(
     initial_conditions=None,
     num_points=None,
     method=None,
-    sv_choice=0,
+    sv_choice=2,
 )
 
 def get_args():
@@ -115,16 +115,21 @@ def main():
     )
     fig2.tight_layout()
 
+    """Xi and eta are not normalized, so the arrow length is not a good indicator of the local magnitude."""
+    xy_norm = np.sqrt(result.xi**2 + result.eta**2)
+    xy_norm[xy_norm == 0] = 1
+
     # 5. Plot the trajectories and the reconstructed vector field
-    ax[1].quiver(X_stacked[0], X_stacked[1], result.xi, result.eta, angles='xy', scale=20, scale_units='xy')
+    ax[1].quiver(X_stacked[0], X_stacked[1], result.xi / xy_norm, result.eta / xy_norm, angles='xy', scale=20)
     ax[1].set_box_aspect(1)
+
 
     for trajectory in X:
         ax[1].plot(trajectory[0], trajectory[1])
 
     ax[1].set_xlabel("x")
     ax[1].set_ylabel("u")
-    ax[1].set_title("Trajectories and reconstructed infinitesimal generator")
+    ax[1].set_title("Trajectories and reconstructed infinitesimal generator (normalized)")
     ax[1].set_box_aspect(1)
 
     # 6. Plot the jet space reconstructed tangent and analytic normal fields side by side
