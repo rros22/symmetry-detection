@@ -15,9 +15,8 @@ from symmetry_detection import generate_trajectories as gtr
 
 # Default case run when this script is invoked with no CLI arguments. Edit any
 # value here to change what runs by default; every field can still be overridden
-# individually from the command line (e.g. `--ode bernoulli`). Leave a field as
-# None to fall back to the shared defaults in generate_trajectories (i.e.
-# ODE_DEFAULTS for that --ode).
+# individually from the command line (e.g. `--ode bernoulli`). Leave fields as
+# None to fall back via resolve_ode_args to ODE_DEFAULTS[ode].
 DEFAULT_CASE = dict(
     ode="bernoulli",
     start=None,

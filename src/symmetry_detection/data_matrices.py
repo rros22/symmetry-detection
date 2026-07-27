@@ -43,21 +43,23 @@ def build_basis_parser(add_help=True):
 
 def resolve_basis_args(args):
     """
-        Normalizes parsed --param_range/--param_list CLI args, applying the same
-        default range used by G_matrix/bf_matrices when neither is provided.
+    Normalize parsed basis CLI args. This is the only place that applies default
+    basis_type / param_range when the user does not pass them on the command line.
     """
     if args.param_range is not None:
         args.param_range = tuple(args.param_range)
     elif args.param_list is None:
-        args.param_range = (0, 3)
+        args.param_range = (0, 1)
     return args
 
-def _validate_parameters(basis_type="monomial", param_range=(0, 3), param_list=None):
-    # 1. Validate basis type
+def _validate_parameters(basis_type, param_range=None, param_list=None):
     if basis_type not in bf.BASIS_FUNCTIONS:
         raise ValueError(
             f"Invalid basis type: {basis_type}. Valid options are: {list(bf.BASIS_FUNCTIONS.keys())}"
         )
+
+    if param_list is None and param_range is None:
+        raise ValueError("Either param_range or param_list must be provided.")
     
     is_chebyshev = (basis_type == "chebyshev")
 
@@ -128,7 +130,7 @@ def _validate_parameters(basis_type="monomial", param_range=(0, 3), param_list=N
     
     return validated_param_list
 
-def bf_matrices(X_stacked, basis_type="monomial", param_range=(0, 3), param_list=None):
+def bf_matrices(X_stacked, basis_type, param_range=None, param_list=None):
     # Check shape of X_stacked
     if len(X_stacked.shape) != 2:
         raise ValueError(f"The shape of the input data matrix is {X_stacked.shape}, with dimension = {len(X_stacked.shape)}. It should be a 2D array")
@@ -162,7 +164,7 @@ def normal_vec_diag_matrices(N):
 def p_diag_matrix(X_stacked):
     return np.diag(X_stacked[2])
 
-def G_matrix(X_stacked, N, basis_type="monomial", param_range=(0, 3), param_list=None):
+def G_matrix(X_stacked, N, basis_type, param_range=None, param_list=None):
     # Evaluate basis function matrices and diagonals
     L, L_x, L_u  = bf_matrices(X_stacked, basis_type, param_range, param_list)
     N_x, N_u, N_ux = normal_vec_diag_matrices(N)

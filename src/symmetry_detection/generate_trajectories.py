@@ -190,7 +190,7 @@ def _generate_trajectory(ode_name, x_start, x_end, u0, num_points, method):
 
     return solution
 
-def generate_equation_manifold(ode_name, x_start=1, x_end=7, initial_conditions=np.linspace(0.75,2,10), num_points=30, method="RK45"):
+def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num_points, method):
     """ 
         o = len(initial_conditions): is the number of trajectories.
         n: is the dimension of the embedding (x, u, u'). In this example n = 3 since we are embbeding ODE trajectories into the first order Jet Space.
@@ -199,6 +199,9 @@ def generate_equation_manifold(ode_name, x_start=1, x_end=7, initial_conditions=
         1. Integrates one of the differential equations in the examples for "o" trajectories.
         2. Constructs a jet space embbeding of the trajectories, by appending the time, derivative wrt time coordinate to the state coordinate.
         3. Returns a np.array of dimensions (o,n,t)
+
+        Integration parameters are not defaulted here; use resolve_ode_args at the CLI
+        boundary or pass values explicitly when calling programmatically.
     """
 
     # Input data
@@ -242,13 +245,23 @@ def build_ode_parser(add_help=True):
     return parser
 
 def resolve_ode_args(args):
-    defaults = ODE_DEFAULTS.get(args.ode, {})
-    args.start = args.start if args.start is not None else defaults.get("x_start", 1.0)
-    args.end = args.end if args.end is not None else defaults.get("x_end", 7.0)
+    """
+    Fill integration parameters from ODE_DEFAULTS when not provided on the CLI.
+    This is the only place that applies default integration settings.
+    """
+    if args.ode not in ODE_DEFAULTS:
+        raise ValueError(
+            f"No default integration parameters for ODE {args.ode!r}. "
+            f"Choose from {list(ODE_DEFAULTS.keys())} or pass --start, --end, "
+            f"--initial_conditions, --num_points, and --method explicitly."
+        )
+    defaults = ODE_DEFAULTS[args.ode]
+    args.start = args.start if args.start is not None else defaults["x_start"]
+    args.end = args.end if args.end is not None else defaults["x_end"]
     if args.initial_conditions is not None:
         args.initial_conditions = np.array(args.initial_conditions)
     else:
-        args.initial_conditions = defaults.get("initial_conditions", np.linspace(0.75, 2, 10))
-    args.num_points = args.num_points if args.num_points is not None else defaults.get("num_points", 30)
-    args.method = args.method if args.method is not None else defaults.get("method", "RK45")
+        args.initial_conditions = defaults["initial_conditions"]
+    args.num_points = args.num_points if args.num_points is not None else defaults["num_points"]
+    args.method = args.method if args.method is not None else defaults["method"]
     return args

@@ -109,13 +109,14 @@ def scaled_3D_quiver_surface(X_grid, U_grid, P_grid, N, x_range, u_range, p_rang
     return fig, ax
 
 
-def scaled_3D_quiver(X_stacked, V, style='scatter', num_points=None, mode="normal"):
+def scaled_3D_quiver(X_stacked, V, style='scatter', num_points=None, mode="normal", ax=None):
     """
     Plot stacked trajectory points with a vector field.
 
     X_stacked and V have shape (3, n_points) with rows (x, u, p) and vector components.
     style: "lines" plots each trajectory as a curve; "scatter" plots all sample points.
     num_points: points per trajectory; required when style='lines'.
+    ax: optional existing 3D axes to draw on; if None, a new figure is created.
     """
     if X_stacked.ndim != 2 or X_stacked.shape[0] != 3:
         raise ValueError(f"X_stacked must have shape (3, n_points), got {X_stacked.shape}.")
@@ -128,8 +129,11 @@ def scaled_3D_quiver(X_stacked, V, style='scatter', num_points=None, mode="norma
 
     x_range, u_range, p_range = compute_data_range(X_stacked)
 
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, projection='3d')
+    if ax is None:
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
 
     Xn, Vn = _unit_cube_transform(X_stacked, V, x_range, u_range, p_range, mode=mode)
     if style == "lines":
@@ -145,7 +149,7 @@ def scaled_3D_quiver(X_stacked, V, style='scatter', num_points=None, mode="norma
     return fig, ax
 
 # Small wrapper for the scaled_3D_quiver function to plot integrated trajectories.
-def scaled_3D_quiver_trajectories(X_stacked, normal_fn, style="lines", num_points=None, mode="normal"):
+def scaled_3D_quiver_trajectories(X_stacked, normal_fn, style="lines", num_points=None, mode="normal", ax=None):
     """
     Plot integrated trajectories with their normal field.
 
@@ -153,7 +157,7 @@ def scaled_3D_quiver_trajectories(X_stacked, normal_fn, style="lines", num_point
     _concatenate_trajectories. The normal field is computed via normal_fn(x, u).
     """
     V = normal_fn(X_stacked[0], X_stacked[1])
-    return scaled_3D_quiver(X_stacked, V, style=style, num_points=num_points, mode=mode)
+    return scaled_3D_quiver(X_stacked, V, style=style, num_points=num_points, mode=mode, ax=ax)
 
 
 
