@@ -83,6 +83,40 @@ def characteristic_functions(L, L_x, L_u, P, coeffs):
 
     return xi, eta, zeta
 
+# Reconstruct the characteristic vector field. We use the same (xi, eta, zeta) API as
+# characteristic_functions so that the same downstream (plotting) functions can be reused,
+# even though this generator is by definition vertical (xi is identically zero).
+#
+# Unlike characteristic_functions, this needs the gradient field N = (-f_x, -f_u, 1) of the
+# ODE manifold F = u_x - f(x, u), in addition to L, L_x, L_u, P. This is because reconstructing
+# zeta requires u_xx = D_x(u_x), which is not derivable from the basis matrices alone - on the
+# equation manifold u_xx = f_x + f*f_u = -(N_x + N_u * u_x), using N_x = -f_x, N_u = -f_u, and
+# u_x = f(x, u) = P (see characteristic_symmetries.pdf, Sec. 2).
+def reconstruct_characteristic(L, L_x, L_u, P, N, coeffs):
+    coeff_no = len(coeffs)
+    if coeff_no % 2 != 0:
+        raise ValueError(f"The number of coefficients is {coeff_no} which is not an even number.")
+
+    xi_coeffs = coeffs[0:int(coeff_no/2)]
+    eta_coeffs = coeffs[int(coeff_no/2):]
+
+    N_x = np.diag(N[0])
+    N_u = np.diag(N[1])
+
+    # The reconstructed generator is vertical by definition (Eq. 3).
+    xi = np.zeros_like(L.T@xi_coeffs)
+
+    # The characteristic: eta_hat = eta - xi * u_x (Eq. 4/10).
+    eta = L.T@eta_coeffs - P@(L.T@xi_coeffs)
+
+    # zeta_hat = D_x(eta_hat) (Eq. 7/11). Expanding via the product rule, D_x(eta_hat) equals
+    # the ordinary point-symmetry prolongation zeta_point (as in characteristic_functions),
+    # plus a -xi * u_xx correction from the u_x-dependence of eta_hat itself.
+    zeta_point = -P@(P@L_u.T + L_x.T)@xi_coeffs + (P@L_u.T + L_x.T)@eta_coeffs
+    zeta = zeta_point + (N_x + N_u@P)@(L.T@xi_coeffs)
+
+    return xi, eta, zeta
+
 
 # Test chevyshev polynomials
 if __name__ == "__main__":

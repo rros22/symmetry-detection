@@ -167,6 +167,7 @@ def normal_vec_diag_matrices(N):
 def p_diag_matrix(X_stacked):
     return np.diag(X_stacked[2])
 
+# Point symmetry
 def G_matrix(X_stacked, N, basis_type, param_range=None, param_list=None):
     # Evaluate basis function matrices and diagonals
     L, L_x, L_u  = bf_matrices(X_stacked, basis_type, param_range, param_list)
@@ -181,3 +182,20 @@ def G_matrix(X_stacked, N, basis_type, param_range=None, param_list=None):
     G = np.vstack((G_1,G_2))
 
     return G, L, L_x, L_u, P 
+
+# Point symmetry in characteristic form
+def G_matrix_char(X_stacked, GF, basis_type, param_range=None, param_list=None):
+    # Note that we by GF we mean Gradient of F, any normal field N is no longer valid
+    L, L_x, L_u  = bf_matrices(X_stacked, basis_type, param_range, param_list)
+    N_x, N_u, N_ux = normal_vec_diag_matrices(GF)
+    U_x = p_diag_matrix(X_stacked)
+
+    # Construct parts of G. Note that N_x = -f_x and N_u = -f_u in some versions of the algorithm, 
+    # and we might need to flip the signs of the basis function matrices.
+    G_1 = - L_x@U_x - L_u@U_x@U_x + L@N_x
+    G_2 = L_x + L_u@U_x + L@N_u
+
+    # Stack parts
+    G = np.vstack((G_1,G_2))
+
+    return G, L, L_x, L_u, U_x 

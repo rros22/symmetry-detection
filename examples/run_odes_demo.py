@@ -17,8 +17,8 @@ from symmetry_detection import solver
 DEFAULT_CASE = dict(
     ode="bernoulli",
     basis_type="monomial",
-    param_range=(0, 3),
-    param_list=None,
+    param_range=(-2, 2),
+    param_list=[(-2,2), (0,0)],
     start=None,
     end=None,
     initial_conditions=None,
@@ -63,11 +63,13 @@ def main():
     N = gtr.NORMALS[args.ode](X_stacked[0], X_stacked[1])
 
     # 2. Build the homogeneous system and solve its null space via SVD.
+    characteristic = True
     svd_result = solver.solve_svd(
         X_stacked, N,
         basis_type=args.basis_type,
         param_range=args.param_range,
         param_list=args.param_list,
+        characteristic=characteristic,
     )
 
     # 3. Identifying the "small" singular values and picking one to
@@ -78,7 +80,7 @@ def main():
     rpt.print_svd_summary(svd_result.S, small_sv_idx)
 
     idx = solver.pick_small_singular_value(small_sv_idx, sv_choice=args.sv_choice)
-    result = solver.select_singular_vector(svd_result, idx)
+    result = solver.select_singular_vector(svd_result, idx, characteristic=characteristic)
     rpt.print_selection_summary(result.S, result.idx)
 
     # Every figure below is derived from this one chosen singular vector, so

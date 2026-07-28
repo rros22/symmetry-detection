@@ -30,13 +30,14 @@ class SVDResult:
     L_x: np.ndarray
     L_u: np.ndarray
     P: np.ndarray
+    N: np.ndarray
     U: np.ndarray
     S: np.ndarray
     Vt: np.ndarray
     param_list: list
 
 
-def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None):
+def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None, characteristic = False):
     """
     Build the homogeneous system G for the given trajectories/normal field
     and solve its null space via SVD. This is pure linear algebra: it makes
@@ -44,14 +45,19 @@ def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None):
     reconstruct from - see `small_singular_value_indices` and
     `select_singular_vector` for those, applied explicitly by the caller.
     """
-    G, L, L_x, L_u, P = dm.G_matrix(
-        X_stacked, N, basis_type=basis_type, param_range=param_range, param_list=param_list,
-    )
+    if characteristic:
+        G, L, L_x, L_u, P = dm.G_matrix_char(
+            X_stacked, N, basis_type=basis_type, param_range=param_range, param_list=param_list,
+        )
+    else:
+        G, L, L_x, L_u, P = dm.G_matrix(
+            X_stacked, N, basis_type=basis_type, param_range=param_range, param_list=param_list,
+        )
     validated_param_list = dm.validate_parameters(basis_type, param_range, param_list)
 
     U, S, Vt = svd(G.T)
 
-    return SVDResult(G=G, L=L, L_x=L_x, L_u=L_u, P=P, U=U, S=S, Vt=Vt, param_list=validated_param_list)
+    return SVDResult(G=G, L=L, L_x=L_x, L_u=L_u, P=P, N=N, U=U, S=S, Vt=Vt, param_list=validated_param_list)
 
 
 def small_singular_value_indices(S, drop_ratio=100.0):
@@ -113,7 +119,7 @@ class SymmetryResult:
     zeta: np.ndarray
 
 
-def select_singular_vector(svd_result, idx):
+def select_singular_vector(svd_result, idx, characteristic=False):
     """
     Reconstruct the characteristic functions (xi, eta, zeta) of the
     generator associated with the singular vector at the given absolute
@@ -125,9 +131,15 @@ def select_singular_vector(svd_result, idx):
         raise ValueError(f"idx={idx} is out of range for {len(svd_result.S)} singular values.")
 
     singular_vector = svd_result.Vt[idx, :]
-    xi, eta, zeta = bf.characteristic_functions(
-        svd_result.L, svd_result.L_x, svd_result.L_u, svd_result.P, singular_vector,
-    )
+
+    if characteristic:
+        xi, eta, zeta = bf.reconstruct_characteristic(
+            svd_result.L, svd_result.L_x, svd_result.L_u, svd_result.P, svd_result.N, singular_vector,
+        )
+    else:
+        xi, eta, zeta = bf.characteristic_functions(
+            svd_result.L, svd_result.L_x, svd_result.L_u, svd_result.P, singular_vector,
+        )
 
     return SymmetryResult(
         G=svd_result.G, L=svd_result.L, L_x=svd_result.L_x, L_u=svd_result.L_u, P=svd_result.P,

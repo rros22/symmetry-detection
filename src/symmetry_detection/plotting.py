@@ -158,6 +158,7 @@ def plot_basis_coefficient_bars(
     ax=None,
     title=None,
     log_scale=False,
+    ylim=None,
 ):
     """
     Bar chart of basis functions versus learnt coefficients for one component
@@ -177,6 +178,10 @@ def plot_basis_coefficient_bars(
         Axes to draw on; if None, a new figure/axes is created.
     title : str, optional
         Axes title.
+    ylim : tuple, optional
+        (ymin, ymax) to apply to the axes. Pass the same values to multiple calls
+        (e.g. via `shared_coefficient_ylim`) to keep several bar charts on a
+        comparable scale.
 
     Returns
     -------
@@ -205,5 +210,31 @@ def plot_basis_coefficient_bars(
     ax.axhline(0, color="k", linewidth=0.5)
     if title is not None:
         ax.set_title(title)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
     return fig, ax
+
+
+def shared_coefficient_ylim(*coeff_arrays, pad=0.05):
+    """
+    Compute a symmetric (ymin, ymax) covering all of the given coefficient
+    arrays, for passing as `ylim` to multiple `plot_basis_coefficient_bars`
+    calls so they share the same y-scale.
+
+    Parameters
+    ----------
+    *coeff_arrays : array-like
+        One or more coefficient arrays (e.g. xi and eta coefficients).
+    pad : float, default 0.05
+        Fractional padding added above/below the largest magnitude.
+
+    Returns
+    -------
+    (ymin, ymax)
+    """
+    max_abs = max(np.max(np.abs(np.asarray(c))) for c in coeff_arrays)
+    if max_abs == 0:
+        max_abs = 1.0
+    margin = max_abs * pad
+    return (-max_abs - margin, max_abs + margin)
