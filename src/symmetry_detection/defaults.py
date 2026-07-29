@@ -26,9 +26,9 @@ ODE_DEFAULTS = {
     "rational": {
         "x_start": 0.75,
         "x_end": 2.0,
-        "initial_conditions": np.linspace(1, 7, 20),
+        "initial_conditions": np.linspace(1, 6, 7),
         "initial_condition": 1.0,
-        "num_points": 50,
+        "num_points": 30,
         "method": "RK45",
     },
     "bernoulli": {

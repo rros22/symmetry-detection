@@ -45,16 +45,17 @@ def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None, chara
     reconstruct from - see `small_singular_value_indices` and
     `select_singular_vector` for those, applied explicitly by the caller.
     """
-    if characteristic:
-        G, L, L_x, L_u, P = dm.G_matrix_char(
-            X_stacked, N, basis_type=basis_type, param_range=param_range, param_list=param_list,
-        )
-    else:
-        G, L, L_x, L_u, P = dm.G_matrix(
-            X_stacked, N, basis_type=basis_type, param_range=param_range, param_list=param_list,
-        )
-    validated_param_list = dm.validate_parameters(basis_type, param_range, param_list)
 
+    G, L, L_x, L_u, P = dm.G_matrix(
+        X_stacked, 
+        N, 
+        basis_type=basis_type, 
+        param_range=param_range, 
+        param_list=param_list,
+        characteristic=characteristic
+    )
+
+    validated_param_list = dm.validate_parameters(basis_type, param_range, param_list)
     U, S, Vt = svd(G.T)
 
     return SVDResult(G=G, L=L, L_x=L_x, L_u=L_u, P=P, N=N, U=U, S=S, Vt=Vt, param_list=validated_param_list)
