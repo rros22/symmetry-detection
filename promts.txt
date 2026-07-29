@@ -1,0 +1,22 @@
+1. This codebase is based around an alogrithm for symmetry detection for ODEs. 
+Trajectories are generated and embedded in jet space by appending the derivative. 
+The normal field is calculated and altogether is used to solve a null space problem 
+that estimates the coefficients of some basis functions whose expansion forms valid 
+infinitesimal symmetries @src/symmetry_detection/data_matrices.py 
+@src/symmetry_detection/generate_trajectories.py . In fact for the hard coded examples 
+this works quite well. In the example @notebooks/ode_symmetry_explorer.ipynb as it currently 
+is we correctly find the symmetry generator of the rational ode, which is c*(-u,x), and can 
+be identified in the SV spectrum by a steep drop. I have also implemented a method for 
+computing the derivtive embedding numerically: @src/symmetry_detection/manifold.py 
+@src/symmetry_detection/generate_trajectories.py but as soon as I use this embedding 
+the steep drop in the sv plot dissepears. I would expect a reduction in the drop but not 
+the dissapearance becuse the embedded trajectoreis look almost the same. Nevertheless, 
+the smallest eigenvalue still produces c2*(-u,x) plus some other terms of smaller magnitude, 
+which is to be expected. I don't know if the sv plot should still show a drop. In fact, 
+it seems that no matter how densely I sample the points the drop never re appers. 
+This worries me slightly, as there is no notion of convergence. One issue that might 
+affect is that i am using the analytic normal field for both cases, and perhaps 
+I should be estimating the normal field using numerical derivatives as well in the 
+numerical case. Have a look and play around to see if you can get something out of 
+this.@src/symmetry_detection/manifold.py . RIght now i am working with no added noise 
+so i dont see how this is presenting so many issues.

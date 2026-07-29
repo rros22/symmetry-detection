@@ -23,6 +23,8 @@ def generate_main():
         initial_conditions=args.initial_conditions,
         num_points=args.num_points,
         method=args.method,
+        rtol=args.rtol,
+        atol=args.atol,
     )
     print(
         f"Generated {X.shape[0]} trajectories x {X.shape[2]} points "
@@ -50,6 +52,8 @@ def detect_main():
         initial_conditions=args.initial_conditions,
         num_points=args.num_points,
         method=args.method,
+        rtol=args.rtol,
+        atol=args.atol,
     )
     X_stacked = gtr.concatenate_trajectories(X)
     N = gtr.NORMALS[args.ode](X_stacked[0], X_stacked[1])

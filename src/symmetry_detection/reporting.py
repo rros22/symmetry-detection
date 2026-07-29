@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 
-def print_ode_configuration(ode_name, x_start, x_end, initial_conditions, num_points, method):
+def print_ode_configuration(ode_name, x_start, x_end, initial_conditions, num_points, method, rtol=None, atol=None):
     """Pretty-print the integration configuration for one ODE run."""
     console = Console()
     ic_arr = np.asarray(initial_conditions)
@@ -22,6 +22,8 @@ def print_ode_configuration(ode_name, x_start, x_end, initial_conditions, num_po
     table.add_row("Trajectory Count", f"{len(ic_arr)} initial conditions")
     table.add_row("IC Range", f"[{ic_arr.min():.2f} ... {ic_arr.max():.2f}]")
     table.add_row("Integrator", method)
+    if rtol is not None or atol is not None:
+        table.add_row("Tolerance", f"rtol={rtol:.1e}, atol={atol:.1e}")
 
     console.print(table)
 

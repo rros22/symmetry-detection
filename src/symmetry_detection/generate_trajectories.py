@@ -9,6 +9,7 @@ from scipy.integrate import solve_ivp
 
 from . import defaults as dflt
 from . import reporting as rpt
+from . import manifold as mfd
 
 # ODEs
 def bernoulli_ode(x,u):
@@ -131,9 +132,14 @@ INTEGRATORS = {
 }
 
 # Generate a full trajectory
-def _generate_trajectory(ode_name, x_start, x_end, u0, num_points, method):
+def _generate_trajectory(ode_name, x_start, x_end, u0, num_points, method, rtol, atol):
     """
-        Integrate one of the differential equations in the examples
+        Integrate one of the differential equations in the examples.
+
+        rtol/atol are passed straight through to solve_ivp. They matter far more than
+        num_points for the *accuracy* of the trajectory: num_points (via t_eval) only
+        controls how densely the already-computed adaptive-step solution is resampled,
+        not how accurately it was computed. See defaults.DEFAULT_RTOL/DEFAULT_ATOL.
     """
 
     if ode_name not in ODES:
@@ -144,11 +150,11 @@ def _generate_trajectory(ode_name, x_start, x_end, u0, num_points, method):
     
     ode_rhs = ODES[ode_name]
     x_eval = np.linspace(x_start, x_end, num_points)
-    solution = solve_ivp(ode_rhs, t_span=(x_start, x_end), t_eval=x_eval, y0 = [u0], method=method)
+    solution = solve_ivp(ode_rhs, t_span=(x_start, x_end), t_eval=x_eval, y0 = [u0], method=method, rtol=rtol, atol=atol)
 
     return solution
 
-def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num_points, method):
+def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num_points, method, rtol, atol, analytic_derivative=True):
     """ 
         o = len(initial_conditions): is the number of trajectories.
         n: is the dimension of the embedding (x, u, u'). In this example n = 3 since we are embbeding ODE trajectories into the first order Jet Space.
@@ -160,19 +166,37 @@ def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num
 
         Integration parameters are not defaulted here; use resolve_ode_args at the CLI
         boundary or pass values explicitly when calling programmatically.
+
+        When analytic_derivative=False, the trajectory's own integration accuracy (rtol,
+        atol) becomes a hard floor on how well the numerically-estimated derivative can
+        agree with the analytic one, independent of num_points - see the note on
+        defaults.DEFAULT_RTOL/DEFAULT_ATOL and _generate_trajectory. If rtol/atol are too
+        loose, increasing num_points will not converge the numerical embedding towards the
+        analytic one, since it just resamples the same, fixed-accuracy dense-output solution.
     """
 
     # Input data
-    rpt.print_ode_configuration(ode_name, x_start, x_end, initial_conditions, num_points, method)
+    rpt.print_ode_configuration(ode_name, x_start, x_end, initial_conditions, num_points, method, rtol, atol)
 
     # Iterate over all initial conditions
     trajectories = []
 
+    if analytic_derivative:
+        print("Constructing embedding with analytic derivative")
+    else:
+        print("Constructing embedding with numerical derivative")
+
     for ic in initial_conditions:
-        solution = _generate_trajectory(ode_name, x_start=x_start, x_end=x_end, u0=ic, num_points=num_points, method=method)
+        solution = _generate_trajectory(ode_name, x_start=x_start, x_end=x_end, u0=ic, num_points=num_points, method=method, rtol=rtol, atol=atol)
 
         if solution.success:
-            embedding = np.array([solution.t, solution.y[0], ODES[ode_name](solution.t, solution.y[0])])
+            if analytic_derivative:
+                # Compute analytic derivative
+                du_dx = ODES[ode_name](solution.t, solution.y[0])
+            else:
+                # Compute numerical derivative
+                du_dx= mfd.estimate_first_derivative(solution)[0]  
+            embedding = np.array([solution.t, solution.y[0], du_dx])
             trajectories.append(embedding)
         
         else:
@@ -200,6 +224,8 @@ def build_ode_parser(add_help=True):
                          help="Initial conditions, e.g. --initial_conditions 1.0 1.1 1.2")
     parser.add_argument("--num_points", type=int, default=None, help="Number of points per trajectory")
     parser.add_argument("--method", choices=INTEGRATORS.keys(), default=None, help="Numerical integrator choice")
+    parser.add_argument("--rtol", type=float, default=None, help="solve_ivp relative tolerance")
+    parser.add_argument("--atol", type=float, default=None, help="solve_ivp absolute tolerance")
     return parser
 
 def resolve_ode_args(args):
@@ -224,4 +250,6 @@ def resolve_ode_args(args):
         args.initial_conditions = defaults["initial_conditions"]
     args.num_points = args.num_points if args.num_points is not None else defaults["num_points"]
     args.method = args.method if args.method is not None else defaults["method"]
+    args.rtol = args.rtol if args.rtol is not None else defaults.get("rtol", dflt.DEFAULT_RTOL)
+    args.atol = args.atol if args.atol is not None else defaults.get("atol", dflt.DEFAULT_ATOL)
     return args

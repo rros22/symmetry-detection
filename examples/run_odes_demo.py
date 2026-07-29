@@ -24,6 +24,8 @@ DEFAULT_CASE = dict(
     initial_conditions=None,
     num_points=None,
     method=None,
+    rtol=None,
+    atol=None,
     sv_choice=2,
 )
 
@@ -57,7 +59,9 @@ def main():
         x_end=args.end,
         initial_conditions=args.initial_conditions,
         num_points=args.num_points,
-        method=args.method)
+        method=args.method,
+        rtol=args.rtol,
+        atol=args.atol)
 
     X_stacked = gtr.concatenate_trajectories(X)
     N = gtr.NORMALS[args.ode](X_stacked[0], X_stacked[1])

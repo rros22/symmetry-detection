@@ -67,3 +67,17 @@ ODE_DEFAULTS = {
 
 DEFAULT_BASIS_TYPE = "monomial"
 DEFAULT_PARAM_RANGE = (0, 1)
+
+# scipy.integrate.solve_ivp defaults to rtol=1e-3, atol=1e-6. That is loose
+# enough that the produced trajectory (and its dense-output interpolant) sits
+# ~1e-3 away from an exact solution of the ODE, *independent of num_points*:
+# t_eval only resamples the interpolant built from the adaptive-step
+# integration, it does not itself refine the integration. When the jet-space
+# embedding uses a numerically estimated derivative (see manifold.py), that
+# fixed ~1e-3 defect dominates the derivative-estimation error at essentially
+# any sampling density, which is why increasing num_points alone does not
+# make the numerical embedding converge towards the analytic one. Tightening
+# the tolerance here (instead of relying on num_points) is what actually buys
+# convergence.
+DEFAULT_RTOL = 1e-10
+DEFAULT_ATOL = 1e-12

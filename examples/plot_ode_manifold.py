@@ -25,6 +25,8 @@ DEFAULT_CASE = dict(
     initial_conditions=None,
     num_points=None,
     method=None,
+    rtol=None,
+    atol=None,
 )
 
 
@@ -46,6 +48,8 @@ def main():
         initial_conditions=args.initial_conditions,
         num_points=args.num_points,
         method=args.method,
+        rtol=args.rtol,
+        atol=args.atol,
     )
 
     fig = plt.figure(figsize=(6, 6))
