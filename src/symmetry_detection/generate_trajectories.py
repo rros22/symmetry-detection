@@ -129,6 +129,7 @@ INTEGRATORS = {
     "Radau": "Radau",
     "BDF": "BDF",
     "LSODA": "LSODA",
+    "DOP853": "DOP853",
 }
 
 # Generate a full trajectory
