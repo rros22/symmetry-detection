@@ -155,7 +155,8 @@ def _generate_trajectory(ode_name, x_start, x_end, u0, num_points, method, rtol,
 
     return solution
 
-def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num_points, method, rtol, atol, analytic_derivative=True):
+def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num_points, method, rtol, atol,
+                                analytic_derivative=True, gaussian_sigma=0, window_length=11, polyorder=3):
     """ 
         o = len(initial_conditions): is the number of trajectories.
         n: is the dimension of the embedding (x, u, u'). In this example n = 3 since we are embbeding ODE trajectories into the first order Jet Space.
@@ -174,6 +175,12 @@ def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num
         defaults.DEFAULT_RTOL/DEFAULT_ATOL and _generate_trajectory. If rtol/atol are too
         loose, increasing num_points will not converge the numerical embedding towards the
         analytic one, since it just resamples the same, fixed-accuracy dense-output solution.
+
+        gaussian_sigma/window_length/polyorder are only used when
+        analytic_derivative=False; they are forwarded as-is to
+        mfd.estimate_first_derivative (see its docstring for their meaning).
+        Defaults match estimate_first_derivative's own defaults, so passing
+        nothing reproduces the previous hardcoded behavior.
     """
 
     # Input data
@@ -196,7 +203,12 @@ def generate_equation_manifold(ode_name, x_start, x_end, initial_conditions, num
                 du_dx = ODES[ode_name](solution.t, solution.y[0])
             else:
                 # Compute numerical derivative
-                du_dx= mfd.estimate_first_derivative(solution)[0]  
+                du_dx = mfd.estimate_first_derivative(
+                    solution,
+                    gaussian_sigma=gaussian_sigma,
+                    window_length=window_length,
+                    polyorder=polyorder,
+                )[0]
             embedding = np.array([solution.t, solution.y[0], du_dx])
             trajectories.append(embedding)
         

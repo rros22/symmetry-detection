@@ -76,10 +76,22 @@ def characteristic_functions(L, L_x, L_u, P, coeffs):
     xi_coeffs = coeffs[0:int(coeff_no/2)]
     eta_coeffs = coeffs[int(coeff_no/2):]
     
-    # Compute the characteristic functions
+    # Compute the characteristic functions. P is the diagonal field u_x
+    # evaluated at every point (one scalar per point), passed as a plain
+    # vector rather than a dense diag(P) matrix: `diag(P) @ M` becomes
+    # `P[:, None] * M` and `diag(P) @ vec` becomes `P * vec`, exact but
+    # O(num_points) instead of O(num_points^2). The scaling is applied to M
+    # *before* reducing over coeffs (not to the already-reduced M @ coeffs),
+    # to match the original diag-matmul evaluation order bit-for-bit -
+    # `a * sum_j(M_j * c_j)` and `sum_j((a * M_j) * c_j)` are only equal up
+    # to floating-point rounding. np.ascontiguousarray forces the same
+    # (C-order) memory layout the original diag-matmul produced, since BLAS
+    # can otherwise pick a different (still correct, but differently-rounded)
+    # summation order for the matmul below depending on layout.
+    M = np.ascontiguousarray(P[:, None] * L_u.T + L_x.T)
     xi = L.T@xi_coeffs
     eta = L.T@eta_coeffs
-    zeta = -P @ (P @ L_u.T + L_x.T) @ xi_coeffs + (P @ L_u.T + L_x.T) @ eta_coeffs
+    zeta = (-P[:, None] * M) @ xi_coeffs + M @ eta_coeffs
 
     return xi, eta, zeta
 
@@ -100,20 +112,26 @@ def reconstruct_characteristic(L, L_x, L_u, P, N, coeffs):
     xi_coeffs = coeffs[0:int(coeff_no/2)]
     eta_coeffs = coeffs[int(coeff_no/2):]
 
-    N_x = np.diag(N[0])
-    N_u = np.diag(N[1])
+    # N_x/N_u and P are diagonal fields (one scalar per point); kept as plain
+    # vectors rather than dense diag(...) matrices - see characteristic_functions.
+    n_x, n_u = N[0], N[1]
 
     # The reconstructed generator is vertical by definition (Eq. 3).
     xi = np.zeros_like(L.T@xi_coeffs)
 
+    Lxi = L.T@xi_coeffs
+
     # The characteristic: eta_hat = eta - xi * u_x (Eq. 4/10).
-    eta = L.T@eta_coeffs - P@(L.T@xi_coeffs)
+    eta = L.T@eta_coeffs - P*Lxi
 
     # zeta_hat = D_x(eta_hat) (Eq. 7/11). Expanding via the product rule, D_x(eta_hat) equals
     # the ordinary point-symmetry prolongation zeta_point (as in characteristic_functions),
     # plus a -xi * u_xx correction from the u_x-dependence of eta_hat itself.
-    zeta_point = -P@(P@L_u.T + L_x.T)@xi_coeffs + (P@L_u.T + L_x.T)@eta_coeffs
-    zeta = zeta_point + (N_x + N_u@P)@(L.T@xi_coeffs)
+    # (See characteristic_functions for why M is scaled before, not after,
+    # reducing over coeffs, and forced C-contiguous.)
+    M = np.ascontiguousarray(P[:, None] * L_u.T + L_x.T)
+    zeta_point = (-P[:, None] * M) @ xi_coeffs + M @ eta_coeffs
+    zeta = zeta_point + (n_x + n_u*P)*Lxi
 
     return xi, eta, zeta
 

@@ -134,7 +134,56 @@ def _warn_if_ill_conditioned(cond, threshold=1e8):
         )
 
 
-def estimate_normal_field(X, window=(2, 5), degree=1, discard_boundary=True, boundary_margin=0):
+def _solve_interior_windows(u_windows, y_windows, x_windows, di, dj, degree, n_coeffs, window_size,
+                             row_chunk_size=None):
+    """
+    Solve the local per-point least-squares fits for every interior point,
+    given the (n_i, n_j, 2*di+1, 2*dj+1) sliding windows. Mathematically
+    identical for any row_chunk_size (each row's fit only depends on its own
+    window), but peak memory differs: with row_chunk_size=None, one
+    (n_i*n_j, window_size, n_coeffs) design-matrix tensor is built for the
+    *entire* grid at once - the dominant memory cost of estimate_normal_field,
+    scaling with num_traj * num_points. Setting row_chunk_size instead loops
+    over blocks of the trajectory axis (n_i), bounding peak memory to
+    O(row_chunk_size * n_j * window_size * n_coeffs) regardless of how large
+    num_traj/num_points are - trading some speed (repeated small numpy calls)
+    for the ability to safely sweep much larger grids.
+    """
+    n_i, n_j = u_windows.shape[:2]
+    if row_chunk_size is None or row_chunk_size >= n_i:
+        row_chunk_size = n_i
+
+    f_x_interior = np.empty((n_i, n_j))
+    f_u_interior = np.empty((n_i, n_j))
+    cond_interior = np.empty((n_i, n_j))
+
+    for i0 in range(0, n_i, row_chunk_size):
+        i1 = min(i0 + row_chunk_size, n_i)
+        n_rows = i1 - i0
+
+        u_chunk = u_windows[i0:i1]
+        y_chunk = y_windows[i0:i1]
+
+        du = u_chunk - u_chunk[:, :, di:di + 1, dj:dj + 1]
+        dx = (x_windows - x_windows[:, dj:dj + 1])[None, :, None, :]
+        dx = np.broadcast_to(dx, du.shape)
+
+        A = _local_design_matrix(dx, du, degree).reshape(n_rows * n_j, window_size, n_coeffs)
+        y = y_chunk.reshape(n_rows * n_j, window_size)
+
+        AtA = np.einsum("nki,nkj->nij", A, A)
+        Aty = np.einsum("nki,nk->ni", A, y)
+        coeffs = np.linalg.solve(AtA, Aty)
+
+        f_x_interior[i0:i1] = coeffs[:, 1].reshape(n_rows, n_j)
+        f_u_interior[i0:i1] = coeffs[:, 2].reshape(n_rows, n_j)
+        cond_interior[i0:i1] = np.linalg.cond(A).reshape(n_rows, n_j)
+
+    return f_x_interior, f_u_interior, cond_interior
+
+
+def estimate_normal_field(X, window=(2, 5), degree=1, discard_boundary=True, boundary_margin=0,
+                           row_chunk_size=None):
     """
         Estimate the normal field N = (-f_x, -f_u, 1) directly from a
         multi-trajectory point cloud, via local (per-point) polynomial
@@ -174,6 +223,16 @@ def estimate_normal_field(X, window=(2, 5), degree=1, discard_boundary=True, bou
            within-margin boundary fallback fits are still computed and then
            discarded by the crop; use discard_boundary=True instead if you
            don't need them for anything else, to skip that wasted work.
+        row_chunk_size: if set, bounds peak memory for the interior solve to
+           O(row_chunk_size * num_points * window_size * n_coeffs) instead of
+           O(num_traj * num_points * window_size * n_coeffs), by looping over
+           blocks of trajectories rather than building one design-matrix
+           tensor for all of them at once. Purely a memory/speed trade-off -
+           results are identical to row_chunk_size=None (the default, one
+           single vectorized batch) for any chunk size. Use this when
+           num_traj * num_points is large enough that the default would
+           allocate an impractically large array (e.g. when sweeping over
+           many/dense trajectories).
 
         Returns a NormalFieldEstimate:
             N: (3, num_traj', num_points') - N[0]=-f_x, N[1]=-f_u, N[2]=1.
@@ -257,27 +316,18 @@ def estimate_normal_field(X, window=(2, 5), degree=1, discard_boundary=True, bou
     u = X[order, 1, :]
     u_x = X[order, 2, :]
 
-    # --- Interior points: fully vectorized, batched least-squares solve ---
+    # --- Interior points: vectorized, batched least-squares solve (optionally
+    # chunked over trajectories via row_chunk_size to bound peak memory) ---
     u_windows = sliding_window_view(u, (2 * di + 1, 2 * dj + 1))
     y_windows = sliding_window_view(u_x, (2 * di + 1, 2 * dj + 1))
     x_windows = sliding_window_view(x_shared, 2 * dj + 1)  # (num_points-2*dj, 2*dj+1)
 
     n_i, n_j = u_windows.shape[:2]  # num_traj-2*di, num_points-2*dj
 
-    du = u_windows - u_windows[:, :, di:di + 1, dj:dj + 1]
-    dx = (x_windows - x_windows[:, dj:dj + 1])[None, :, None, :]
-    dx = np.broadcast_to(dx, du.shape)
-
-    A = _local_design_matrix(dx, du, degree).reshape(n_i * n_j, window_size, n_coeffs)
-    y = y_windows.reshape(n_i * n_j, window_size)
-
-    AtA = np.einsum("nki,nkj->nij", A, A)
-    Aty = np.einsum("nki,nk->ni", A, y)
-    coeffs = np.linalg.solve(AtA, Aty)
-    cond_interior = np.linalg.cond(A).reshape(n_i, n_j)
-
-    f_x_interior = coeffs[:, 1].reshape(n_i, n_j)
-    f_u_interior = coeffs[:, 2].reshape(n_i, n_j)
+    f_x_interior, f_u_interior, cond_interior = _solve_interior_windows(
+        u_windows, y_windows, x_windows, di, dj, degree, n_coeffs, window_size,
+        row_chunk_size=row_chunk_size,
+    )
 
     if discard_boundary:
         if 2 * margin_i >= n_i or 2 * margin_j >= n_j:

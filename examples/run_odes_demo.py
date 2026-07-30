@@ -17,8 +17,8 @@ from symmetry_detection import solver
 DEFAULT_CASE = dict(
     ode="bernoulli",
     basis_type="monomial",
-    param_range=(-2, 2),
-    param_list=[(-2,2), (0,0)],
+    param_range=(0, 3),
+    param_list=None, # [(-2,2), (0,0)],
     start=None,
     end=None,
     initial_conditions=None,
@@ -74,6 +74,8 @@ def main():
         param_range=args.param_range,
         param_list=args.param_list,
         characteristic=characteristic,
+        noise="isotropic",
+        noise_level=0.0000000001,  # 0.1% zero-mean Gaussian noise on G
     )
 
     # 3. Identifying the "small" singular values and picking one to

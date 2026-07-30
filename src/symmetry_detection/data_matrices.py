@@ -158,32 +158,38 @@ def bf_matrices(X_stacked, basis_type, param_range=None, param_list=None):
     return L, L_x, L_u
 
 def normal_vec_diag_matrices(N):
-    N_x = np.diag(N[0])
-    N_u = np.diag(N[1])
-    N_ux = np.diag(N[2])
-
-    return N_x, N_u, N_ux
+    # N_x/N_u/N_ux are diagonal fields (one scalar per point), not genuine
+    # dense matrices. Returning them as plain vectors keeps every downstream
+    # "matrix" @ these terms as an O(n_basis * num_points) elementwise scale
+    # instead of materializing an O(num_points^2) dense diagonal matrix and
+    # paying O(n_basis * num_points^2) for a matmul against it. `M @ diag(v)`
+    # equals `M * v` (broadcast over the last axis); `diag(v) @ M` equals
+    # `v[:, None] * M` (broadcast over the first axis).
+    return N[0], N[1], N[2]
 
 def p_diag_matrix(X_stacked):
-    return np.diag(X_stacked[2])
+    return X_stacked[2]
 
 # Point symmetry
 def G_matrix(X_stacked, N, basis_type, param_range=None, param_list=None, characteristic=False):
-    # Evaluate basis function matrices and diagonals
+    # Evaluate basis function matrices and diagonal fields (as vectors, see
+    # normal_vec_diag_matrices/p_diag_matrix above)
     L, L_x, L_u  = bf_matrices(X_stacked, basis_type, param_range, param_list)
-    N_x, N_u, N_ux = normal_vec_diag_matrices(N)
-    P = p_diag_matrix(X_stacked)
+    n_x, n_u, n_ux = normal_vec_diag_matrices(N)
+    p = p_diag_matrix(X_stacked)
 
-    # Construct parts of G (characteristic or regular symmetry)
+    # Construct parts of G (characteristic or regular symmetry). Every
+    # `M @ diag(v)` from the dense formulation becomes `M * v` here (exact,
+    # since v broadcasts along M's last axis).
     if characteristic:
-        G_1 = - L_x@P - L_u@P@P + L@N_x
-        G_2 = L_x + L_u@P + L@N_u
+        G_1 = - L_x*p - L_u*p*p + L*n_x
+        G_2 = L_x + L_u*p + L*n_u
     else:
-        G_1 = L@N_x - (L_x + L_u@P)@P@N_ux
-        G_2 = L@N_u + (L_x + L_u@P)@N_ux
+        G_1 = L*n_x - (L_x + L_u*p)*p*n_ux
+        G_2 = L*n_u + (L_x + L_u*p)*n_ux
 
 
     # Stack parts
     G = np.vstack((G_1,G_2))
 
-    return G, L, L_x, L_u, P 
+    return G, L, L_x, L_u, p

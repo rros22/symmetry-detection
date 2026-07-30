@@ -37,13 +37,68 @@ class SVDResult:
     param_list: list
 
 
-def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None, characteristic = False):
+def _sample_gaussian_noise(G, noise, noise_level, rng):
+    """
+    Draw a zero-mean Gaussian noise matrix the same shape as G, scaled
+    relative to G's own RMS magnitude by `noise_level` (e.g. 0.001 for 0.1%
+    noise). Two covariance structures are supported:
+
+    - "isotropic": every entry of G is perturbed independently and
+      identically (covariance = sigma^2 * I over the flattened entries) -
+      no correlation between entries.
+    - "constant_covariance": each column of G (one data point) is perturbed
+      by an independent draw from a single, fixed multivariate normal
+      N(0, Sigma). Sigma is the empirical covariance across G's rows, so
+      correlations between rows (e.g. basis function vs. its derivatives)
+      are preserved, rescaled so the overall noise level still matches
+      noise_level. The same Sigma is reused for every column - hence
+      "constant" - rather than being isotropic across the whole matrix.
+    """
+    sigma = noise_level * np.sqrt(np.mean(G ** 2))
+
+    if noise == "isotropic":
+        return rng.normal(loc=0.0, scale=sigma, size=G.shape)
+
+    if noise == "constant_covariance":
+        row_cov = np.atleast_2d(np.cov(G))
+        row_scale = np.sqrt(np.mean(np.diag(row_cov)))
+        row_scale = row_scale if row_scale > 0 else 1.0
+        cov = (sigma / row_scale) ** 2 * row_cov
+        return rng.multivariate_normal(mean=np.zeros(G.shape[0]), cov=cov, size=G.shape[1]).T
+
+    raise ValueError(
+        f"Unknown noise type: {noise!r}. Expected one of: None, 'isotropic', 'constant_covariance'."
+    )
+
+
+def add_gaussian_noise(G, noise=None, noise_level=0.0, rng=None):
+    """
+    Add zero-mean Gaussian noise to G, relative to its own magnitude.
+    noise=None (the default, no noise added) or noise_level=0 leaves G
+    untouched. Otherwise noise must be "isotropic" or "constant_covariance"
+    (see `_sample_gaussian_noise`), and noise_level is the relative noise
+    scale (e.g. 0.001 for 0.1% noise). Pass an explicit `rng`
+    (np.random.Generator) for reproducibility.
+    """
+    if noise is None or noise_level == 0:
+        return G
+    rng = np.random.default_rng() if rng is None else rng
+    return G + _sample_gaussian_noise(G, noise, noise_level, rng)
+
+
+def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None, characteristic=False,
+              noise=None, noise_level=0.0, rng=None):
     """
     Build the homogeneous system G for the given trajectories/normal field
     and solve its null space via SVD. This is pure linear algebra: it makes
     no judgment about which singular value(s) are "small" or which one to
     reconstruct from - see `small_singular_value_indices` and
     `select_singular_vector` for those, applied explicitly by the caller.
+
+    Optionally, zero-mean Gaussian noise can be added to G before the SVD
+    via `noise` ("isotropic" or "constant_covariance", see
+    `add_gaussian_noise`) and `noise_level`. By default noise=None, so no
+    noise is added.
     """
 
     G, L, L_x, L_u, P = dm.G_matrix(
@@ -54,6 +109,8 @@ def solve_svd(X_stacked, N, basis_type, param_range=None, param_list=None, chara
         param_list=param_list,
         characteristic=characteristic
     )
+
+    G = add_gaussian_noise(G, noise=noise, noise_level=noise_level, rng=rng)
 
     validated_param_list = dm.validate_parameters(basis_type, param_range, param_list)
     U, S, Vt = svd(G.T)
